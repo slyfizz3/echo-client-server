@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
 			break;
 		}
 		sock_arr.insert(cli_sd);
-		thread* t = new std::thread(recvThread, cli_sd);
+		thread* t = new thread(recvThread, cli_sd);
 		t->detach();
 	}
 	close(sd);
