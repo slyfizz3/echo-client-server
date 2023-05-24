@@ -4,10 +4,12 @@
 #include <iostream>
 #include <thread>
 #include <arpa/inet.h>
+#include <set>
 
 
 using namespace std;
 
+set<int> sock_arr;
 
 void usage() {
 	cout << "syntax : echo-server <port> [-e[-b]]\n";
@@ -18,15 +20,32 @@ void usage() {
 
 struct Param {
 	bool echo{false};
+	bool broadcast{false};
 	uint16_t port{0};
 
 	bool parse(int argc, char* argv[]) {
-		for (int i = 1; i < argc; i++) {
-			if (strcmp(argv[i], "-e") == 0) {
-				echo = true;
+
+		if(argc < 2){
+			return 0;
+		}
+
+		port = atoi(argv[1]);
+
+		for (int i = 2; i < argc; i++) {
+
+			if (strcmp(argv[i], "-b") == 0) {
+				broadcast = true;
+				cout << "broadcast on" << endl;
 				continue;
 			}
-			port = atoi(argv[i++]);
+			if (strcmp(argv[i], "-e") == 0) {
+				echo = true;
+				cout << "echo on" << endl;
+				continue;
+			}
+		}
+		if ((echo|broadcast) != true){
+			cout << "no option" << endl;
 		}
 		return port != 0;
 	}
@@ -37,23 +56,38 @@ void recvThread(int sd) {
 	static const int BUFSIZE = 65536;
 	char buf[BUFSIZE];
 	while (true) {
-		ssize_t res = ::recv(sd, buf, BUFSIZE - 1, 0);
+		ssize_t res = recv(sd, buf, BUFSIZE - 1, 0);
 		if (res == 0 || res == -1) {
 			cerr << "recv return " << res << endl;
-			perror(" ");
+			perror("recv");
+			sock_arr.erase(sd);
 			break;
 		}
 		buf[res] = '\0';
 		cout << buf << endl;
-		fflush(stdout);
-		if (param.echo) {
-			res = ::send(sd, buf, res, 0);
+		if (param.broadcast) {
+			set<int>::iterator sock;
+			for (sock=sock_arr.begin();sock !=sock_arr.end();sock++){
+				res = send(*sock, buf, res, 0);
+				if (res == 0 || res == -1) {
+					cerr << "send return " << res << endl;
+					perror("send");
+					sock_arr.erase(*sock);
+					break;
+				}
+
+			}
+		}
+		else if (param.echo) {
+			res = send(sd, buf, res, 0);
 			if (res == 0 || res == -1) {
 				cerr << "send return " << res << endl;
-				perror(" ");
+				perror("send");
+				sock_arr.erase(sd);
 				break;
 			}
 		}
+
 	}
 	cout << "disconnected\n";
 	close(sd);
@@ -103,6 +137,7 @@ int main(int argc, char* argv[]) {
 			perror("accept");
 			break;
 		}
+		sock_arr.insert(cli_sd);
 		thread* t = new std::thread(recvThread, cli_sd);
 		t->detach();
 	}

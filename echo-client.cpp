@@ -14,7 +14,7 @@ void usage() {
 }
 
 struct Param {
-	struct in_addr ip;
+	struct in_addr ip{0};
 	uint16_t port{0};
 
 	bool parse(int argc, char* argv[]) {
@@ -39,11 +39,11 @@ void recvThread(int sd) {
 		ssize_t res = recv(sd, buf, BUFSIZE - 1, 0);
 		if (res == 0 || res == -1) {
 			cerr << "recv return "<< res << endl;
-			perror(" ");
+			perror("recv");
 			break;
 		}
 		buf[res] = '\0';
-		cout << "%s", buf;
+		cout << buf <<endl;
 		fflush(stdout);
 	}
 	cout << "disconnected\n";
