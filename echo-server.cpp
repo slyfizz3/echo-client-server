@@ -1,25 +1,19 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef __linux__
-#include <arpa/inet.h>
 #include <sys/socket.h>
-#endif // __linux
-#ifdef WIN32
-#include <winsock2.h>
-#include "../mingw_net.h"
-#endif // WIN32
+#include <iostream>
 #include <thread>
+#include <arpa/inet.h>
 
-#ifdef WIN32
-void perror(const char* msg) { fprintf(stderr, "%s %ld\n", msg, GetLastError()); }
-#endif // WIN32
+
+using namespace std;
+
 
 void usage() {
-	printf("syntax: ts [-e] <port>\n");
-	printf("  -e : echo\n");
-	printf("sample: ts 1234\n");
+	cout << "syntax : echo-server <port> [-e[-b]]\n";
+	cout << "  -e : echo\n";
+	cout << "  -b : broadcast\n";
+	cout << "sample : echo-server 1234 -e -b\n";
 }
 
 struct Param {
@@ -39,30 +33,30 @@ struct Param {
 } param;
 
 void recvThread(int sd) {
-	printf("connected\n");
+	cout << "connected\n";
 	static const int BUFSIZE = 65536;
 	char buf[BUFSIZE];
 	while (true) {
 		ssize_t res = ::recv(sd, buf, BUFSIZE - 1, 0);
 		if (res == 0 || res == -1) {
-			fprintf(stderr, "recv return %ld", res);
+			cerr << "recv return " << res << endl;
 			perror(" ");
 			break;
 		}
 		buf[res] = '\0';
-		printf("%s", buf);
+		cout << buf << endl;
 		fflush(stdout);
 		if (param.echo) {
 			res = ::send(sd, buf, res, 0);
 			if (res == 0 || res == -1) {
-				fprintf(stderr, "send return %ld", res);
+				cerr << "send return " << res << endl;
 				perror(" ");
 				break;
 			}
 		}
 	}
-	printf("disconnected\n");
-	::close(sd);
+	cout << "disconnected\n";
+	close(sd);
 }
 
 int main(int argc, char* argv[]) {
@@ -71,27 +65,19 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 
-#ifdef WIN32
-	WSAData wsaData;
-	WSAStartup(0x0202, &wsaData);
-#endif // WIN32
-
-	int sd = ::socket(AF_INET, SOCK_STREAM, 0);
+	int sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sd == -1) {
 		perror("socket");
 		return -1;
 	}
 
 	int res;
-#ifdef __linux__
 	int optval = 1;
-	res = ::setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+	res = setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 	if (res == -1) {
 		perror("setsockopt");
 		return -1;
 	}
-#endif // __linux
-
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
@@ -112,13 +98,13 @@ int main(int argc, char* argv[]) {
 	while (true) {
 		struct sockaddr_in cli_addr;
 		socklen_t len = sizeof(cli_addr);
-		int cli_sd = ::accept(sd, (struct sockaddr *)&cli_addr, &len);
+		int cli_sd = accept(sd, (struct sockaddr *)&cli_addr, &len);
 		if (cli_sd == -1) {
 			perror("accept");
 			break;
 		}
-		std::thread* t = new std::thread(recvThread, cli_sd);
+		thread* t = new std::thread(recvThread, cli_sd);
 		t->detach();
 	}
-	::close(sd);
+	close(sd);
 }
